@@ -686,9 +686,9 @@ def game(gameMap,character,difficulty,room):
         playerHeal(character,lifeList)
 
         #pathfinding(currently rapes performance)
-        for badguy in enemyList:
-            badguy.updateTicks()
-            badguy.pathfind(character.getTile(cameraOffset,(screenSizeX,screenSizeY)),matrix)
+        #for badguy in enemyList:
+            #badguy.updateTicks()
+            #badguy.pathfind(character.getTile(cameraOffset,(screenSizeX,screenSizeY)),matrix)
         #
         for bullet in bullets:
             bullet.draw(display,cameraOffset)
