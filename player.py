@@ -4,6 +4,7 @@ import random
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
+from pygame.constants import NOEVENT
 #import numpy
 
 class Person(pygame.sprite.Sprite):
@@ -21,7 +22,7 @@ class Person(pygame.sprite.Sprite):
     self.invincibilityFrames = 30
   
   def getTile(self,cameraOffset,resolution):
-    self.tile = cameraOffset[0]//32 + resolution[0]//128, cameraOffset[1]//32  + resolution[1]//128 #formula for calculating currentTile
+    self.tile = int((cameraOffset[0]+8)/32 + (resolution[0])/128), int((cameraOffset[1]+8)/32  + (resolution[1])/128) #formula for calculating currentTile
     return self.tile
 
   def updateScreenPosition(self,x,y):
@@ -81,7 +82,7 @@ class life(pygame.sprite.Sprite):
   
 
 class angrydude(pygame.sprite.Sprite):
-  def __init__(self,image,scale,difficulty,tilex,tiley,map,number):
+  def __init__(self,image,scale,difficulty,tilex,tiley,map,number,howMany):
     super().__init__()
     width = image.get_width()
     height = image.get_height()
@@ -97,12 +98,17 @@ class angrydude(pygame.sprite.Sprite):
     self.startx = tilex
     self.starty = tiley
     self.ticks = number
+    self.path = []
+    self.targetCoordinates = (None,None)
+    self.pathfindTicks = howMany +1
     if difficulty == 2:
       self.health = 12
       self.damage = 4
+      self.speed = 2.5
     else:
       self.health = 6
       self.damage = 2
+      self.speed = 2
 
     
     #pathfinding setup
@@ -111,37 +117,49 @@ class angrydude(pygame.sprite.Sprite):
   
   def getTile(self,player,cameraOffset,resolution):
     playerTile = player.getTile(cameraOffset,resolution)
-    tileDistance = self.rect.x//32 - resolution[0]//128, self.rect.y//32 - resolution[1]//128
-    self.tile = (playerTile[0] + tileDistance[0],playerTile[1]+ tileDistance[1])
+    tileDistance = int((self.rect.x+8)/32 - resolution[0]/128), int((self.rect.y+8)/32 - resolution[1]/128)
+    self.tile = (playerTile[0] + tileDistance[0], playerTile[1]+ tileDistance[1])
     return self.tile
   
   def updateTicks(self):
     self.ticks += 1
 
-  def pathfind(self,playerTile,matrix):
+#warning: performance suffers heavily when more than 1 instance of A* is ran in a single frame.
+  def pathfind(self,playerTile,matrix,tile):
     searching = False
-    if self.ticks == 60:
-      self.ticks = 0
-      searching = True
+    if self.ticks >= self.pathfindTicks:                                        #if 1 second has elapsed
+      self.ticks = 0                                                            #reset time to 0
+      searching = True                                                          #start searching
     while searching:
-      y,x = int(playerTile[0]),int(playerTile[1])
-      self.grid = Grid(matrix=matrix)
-      self.start = self.grid.node(self.tilex,self.tiley)
-      self.end = self.grid.node(y,x)
-      finder = AStarFinder(diagonal_movement=DiagonalMovement.never)
-      self.pathIndex = 0
-      self.path, runs = finder.find_path(self.start,self.end,self.grid)
-      print(self.grid.grid_str(path=self.path, start=self.start, end=self.end))
-      searching = False
+      y,x = int(playerTile[0]),int(playerTile[1])                               #define target's coordinates
+      self.grid = Grid(matrix=matrix)                                           #create matrix for A*,using grid
+      self.start = self.grid.node(int(tile[0]),int(tile[1]))                    #define the startpoint
+      self.end = self.grid.node(y,x)                                            #use target coordinate as endpoint
+      finder = AStarFinder(diagonal_movement=DiagonalMovement.always)           #select A* as the pathfinder, ensure no diagonal movement
+      self.path, runs = finder.find_path(self.start,self.end,self.grid)         #find the path
+      
+      #debugging purposes
+      #print(self.path)                                                          
+      #print(self.grid.grid_str(path=self.path, start=self.start, end=self.end))
+
+      searching = False                                                         #end the loop
   
   def updatePath(self):
-    now = pygame.time.get_ticks()
-    if now - self.moveTimer > 1000:
-      new = self.path[self.pathIndex]
+    if self.targetCoordinates == self.tile or self.targetCoordinates[0] == None or self.targetCoordinates[1] == None: #if no valid next move:
+      if len(self.path) > 0:                                                                                          #check if there's a next move to make
+        self.targetCoordinates = self.path.pop(0)
+      else:
+        return 0                                                                                                      #if there isn't then default to the old one
+    if self.path == []:
+      self.targetCoordinates =self.tile
+      return 0
+    self.movex = -self.speed*(self.targetCoordinates[0] - self.tile[0])                                               #update the distance that needs to be travelled
+    self.movey = -self.speed*(self.targetCoordinates[1] - self.tile[1])
+    return 1
 
 
   def updatePosition(self,cameraOffset,direction):
-    x,y=direction[0],direction[1]                     # x,y representing the x and y distances that the bad dudes move by
+    x,y=direction[0],direction[1]                                         # x,y representing the x and y distances that the bad dudes move by
     self.startx -= x/32                               
     self.starty -= y/32
     self.rect.x = (self.startx)*32 - cameraOffset[0]  
@@ -155,8 +173,8 @@ class angrydude(pygame.sprite.Sprite):
     else:
       direction = (distance[0]/length,distance[1]/length)                 #calculate the direction
 
-    newX = -(2*direction[0])                                              #the multiplier represents the speed
-    newY = -(2*direction[1])
+    newX = -(self.speed*direction[0])                                     
+    newY = -(self.speed*direction[1])
     return (newX,newY)
     #would be used for rotation but it's not working well so i disabled it.
     #angle = math.degrees(math.atan2(direction[1],direction[0]))
@@ -188,7 +206,7 @@ class Bullet(pygame.sprite.Sprite):
         self.bullet = pygame.Surface((10, 4)).convert_alpha()
         self.bullet.fill((255, 255, 255))
         self.bullet = pygame.transform.rotate(self.bullet, angle)
-        self.speed = 25
+        self.speed = 15
         self.rect = self.bullet.get_rect(center = self.pos)
         self.rect.x = x
         self.rect.y = y

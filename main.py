@@ -403,17 +403,17 @@ def bulletEnemy(bullets,enemyList):
 def move(rect, movement, tiles):
     hit_list = collideTest(rect,tiles)
     for tile in hit_list:
-        if (rect.right - tile.left) < 5:
-            movement[0] += (tile.left - rect.right) #-1
+        if (rect.right - tile.left) < 4:
+            movement[0] += (tile.left - rect.right)
              #these are the same for collisions on that side, perhaps use this to decide where to move the player.
-        elif (tile.right - rect.left)<5:
-            movement[0] += (tile.right - rect.left) #-1
+        elif (tile.right - rect.left)<4:
+            movement[0] += (tile.right - rect.left)
 
-        elif (rect.bottom -tile.top) < 5:
-            movement[1] += (tile.top - rect.bottom) #-1
+        elif (rect.bottom -tile.top) <4:
+            movement[1] += (tile.top - rect.bottom)
 
-        elif (tile.bottom - rect.top) < 5:
-            movement[1] -= (rect.top - tile.bottom) #-1
+        elif (tile.bottom - rect.top) < 4:
+            movement[1] -= (rect.top - tile.bottom)
             
     return movement[0],movement[1]
 
@@ -465,7 +465,7 @@ def placeAngryDudes(gameMap,image,scale,difficulty,howMany):
         coordinates = floors[floor] #coordinates of the floor tile
         floors.pop(floor)
         y,x = coordinates[0],coordinates[1]
-        enemy =  player.angrydude(image,scale,difficulty,x,y,gameMap,i)
+        enemy =  player.angrydude(image,scale,difficulty,x,y,gameMap,i,howMany)
         enemyList.append(enemy)
     return (enemyList)
 
@@ -486,15 +486,17 @@ def placeLife(gameMap,image,scale,howMany):
 
 def createMatrix(gameMap):
     matrix = gameMap
-    for y in range(len(matrix)-1):
+    for y in range(len(matrix)-1):      #loop through the grid
         for x in range(len(matrix)-1):
-            if matrix[y][x] != 1:
-                matrix[y][x] = 0
-    #matrix = numpy.asarray(matrix)
+            if matrix[y][x] != 1:       #if it's not a floor tile
+                matrix[y][x] = 0        #make it an obsticle. 
     return matrix
 
 def game(gameMap,character,difficulty,room):
+    enemyConstant = 5
     previousRes = (800,600)
+
+    
     #variable which gets returned
     room += 1
     #setting up text for the HUD
@@ -540,7 +542,7 @@ def game(gameMap,character,difficulty,room):
 
     #AngryDudes being placed and added to the srite group
     enemySpriteGroup = pygame.sprite.Group()
-    enemyList = placeAngryDudes(gameMap,angrydudeimg,1,difficulty,5*(room-1))
+    enemyList = placeAngryDudes(gameMap,angrydudeimg,1,difficulty,enemyConstant*(room-1))
     for i in range(len(enemyList)):
         enemySpriteGroup.add(enemyList[i])
 
@@ -558,6 +560,7 @@ def game(gameMap,character,difficulty,room):
     #generate the matrix for the map, used for pathfinding
     gameMap2 = copy.deepcopy(gameMap)
     matrix = createMatrix(gameMap2)
+
     distanceFromDoor = (0,0)
 
     #GAME LOOP
@@ -669,11 +672,11 @@ def game(gameMap,character,difficulty,room):
                     if enemyCount:
                         tilesRects.append(pygame.Rect(x*tileWidth-cameraOffset[0],y*tileWidth-cameraOffset[1],tileWidth,tileWidth))
 
-        distanceFromDoor = (doorX*32 - cameraOffset[0]-screenSizeX/4,doorY*32-cameraOffset[1]-screenSizeY/4)
+        distanceFromDoor = (-doorX*32 + cameraOffset[0]+screenSizeX/4 ,doorY*32-cameraOffset[1]-screenSizeY/4)
         #put the enemy in the correct place
 
-        for enemy in enemyList:
-            enemy.updatePosition(cameraOffset,enemy.chasePlayer(character))
+        #for enemy in enemyList:
+            #enemy.updatePosition(cameraOffset,(enemy.chasePlayer(character)))
         
         #putting items in the correct places:
         for life in lifeList:
@@ -685,10 +688,15 @@ def game(gameMap,character,difficulty,room):
         playerHit(character,enemyList)
         playerHeal(character,lifeList)
 
-        #pathfinding(currently rapes performance)
-        #for badguy in enemyList:
-            #badguy.updateTicks()
-            #badguy.pathfind(character.getTile(cameraOffset,(screenSizeX,screenSizeY)),matrix)
+        #pathfinding
+        for badguy in enemyList:
+            badguy.updateTicks()
+            badguy.pathfind(character.getTile(cameraOffset,(screenSizeX,screenSizeY)),matrix,badguy.getTile(character,cameraOffset,(screenSizeX,screenSizeY)))
+            if badguy.updatePath() == 0:
+                badguy.updatePosition(cameraOffset,(badguy.chasePlayer(character)))
+            elif badguy.updatePath() == 1:
+                badguy.updatePosition(cameraOffset,(badguy.movex,badguy.movey))
+
         #
         for bullet in bullets:
             bullet.draw(display,cameraOffset)
