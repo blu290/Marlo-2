@@ -50,6 +50,8 @@ class Person(pygame.sprite.Sprite):
     if self.invincibilityFrames >= 30:
       self.health -= damage
       self.invincibilityFrames = 0
+      return 1
+    return 0
 
   def heal(self,heal):
     self.health += heal
@@ -91,8 +93,8 @@ class angrydude(pygame.sprite.Sprite):
     self.image = image
     self.image = pygame.transform.scale(image,(int(width*scale),int(height*scale)))
     self.rect = self.image.get_rect()
-    self.rect.x = tilex*32
-    self.rect.y = tiley*32
+    self.rect.x = tilex*32 +8
+    self.rect.y = tiley*32 +8
     self.tilex = tilex
     self.tiley = tilex
     self.startx = tilex
@@ -135,8 +137,10 @@ class angrydude(pygame.sprite.Sprite):
       self.grid = Grid(matrix=matrix)                                           #create matrix for A*,using grid
       self.start = self.grid.node(int(tile[0]),int(tile[1]))                    #define the startpoint
       self.end = self.grid.node(y,x)                                            #use target coordinate as endpoint
-      finder = AStarFinder(diagonal_movement=DiagonalMovement.always)           #select A* as the pathfinder, ensure no diagonal movement
+      finder = AStarFinder(diagonal_movement=DiagonalMovement.never)           #select A* as the pathfinder, ensure no diagonal movement
       self.path, runs = finder.find_path(self.start,self.end,self.grid)         #find the path
+      if self.path != []:
+        self.path.pop(0)
       
       #debugging purposes
       #print(self.path)                                                          

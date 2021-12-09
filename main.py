@@ -7,6 +7,7 @@ import math
 import random
 import player
 import copy
+from playsound import playsound
 #import numpy
 
 #####LEVELGRID AND PROCEDURAL GENERATION#####
@@ -420,7 +421,8 @@ def move(rect, movement, tiles):
 def playerHit(character,enemyList):
     for enemy in enemyList:
         if character.rect.colliderect(enemy):
-            character.takeDamage(enemy.damage)
+            if character.takeDamage(enemy.damage) ==1:
+                playsound("sounds/damage.mp3",0)
 
 def playerHeal(character,lifeList):
     if character.fullHealth():
@@ -449,10 +451,13 @@ def findFloors(gameMap):
     floorList = [] #a list that stores a tuple for each location of floor tile, index 0 is x and index y is 1
     for x in range(0,len(gameMap)-1): #loop through each tile
         for y in range(0,len(gameMap)-1):
-            if gameMap[y][x] == 1: #if the tile is a floor
+            if gameMap[y][x] == 1: #if the tile is a floordd
                 floorCoordinates = (y,x)
                 floorList.append(floorCoordinates)
     return floorList
+
+def shootSound():
+    playsound("sounds/gun"+str(random.randint(0,4))+".mp3",0)
 
 def placeAngryDudes(gameMap,image,scale,difficulty,howMany):
     floors = findFloors(gameMap)
@@ -607,6 +612,8 @@ def game(gameMap,character,difficulty,room):
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:                               #when the mouse button is pressed
                 if shootDelay>=20:                                                 #if the bullet is ready to be fired
+                    shootSound()
+                    #playsound('sounds/gun0.mp3',0)
                     bullet = player.Bullet(screenSizeX/2,screenSizeY/2,)           #create a bullet object and put it in a list
                     bullets.append(bullet)
                     shootDelay = 0                                                 #reset it so its not ready to fire.
@@ -769,10 +776,12 @@ while True:
     if gameOrMenu == 11:
         gameOrMenu = 0
         print("you win!")
+        playsound("sounds/win.mp3",0)
     #if the character's health drops to 0 or below
     if gameOrMenu ==99:
         gameOrMenu = 0
         print("you died :(")
+        playsound("sounds/lose.mp3",0)
 
     #done is always False as nothing changes it
     # every time a room number is returned, this code is ran in order to generate a new grid.     
