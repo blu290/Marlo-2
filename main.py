@@ -7,7 +7,8 @@ import math
 import random
 import player
 import copy
-from playsound import playsound
+#from playsound import playsound
+#from sys import platform
 #import numpy
 
 #####LEVELGRID AND PROCEDURAL GENERATION#####
@@ -418,11 +419,28 @@ def move(rect, movement, tiles):
             
     return movement[0],movement[1]
 
+def enemyWallCollide(rect, movement, tiles):
+    hit_list = collideTest(rect,tiles)
+    for tile in hit_list:
+        if (rect.right - tile.left) < 4:
+            movement[0] += (tile.left - rect.right)
+             #these are the same for collisions on that side, perhaps use this to decide where to move the player.
+        elif (tile.right - rect.left)<4:
+            movement[0] += (tile.right - rect.left)
+
+        elif (rect.bottom -tile.top) <4:
+            movement[1] += (tile.top - rect.bottom)
+
+        elif (tile.bottom - rect.top) < 4:
+            movement[1] -= (rect.top - tile.bottom)
+            
+    return movement[0],movement[1]
+
 def playerHit(character,enemyList):
     for enemy in enemyList:
         if character.rect.colliderect(enemy):
             if character.takeDamage(enemy.damage) ==1:
-                playsound("sounds/damage.mp3",0)
+                pygame.mixer.Sound("sounds/damage.mp3").play()
 
 def playerHeal(character,lifeList):
     if character.fullHealth():
@@ -457,7 +475,7 @@ def findFloors(gameMap):
     return floorList
 
 def shootSound():
-    playsound("sounds/gun"+str(random.randint(0,4))+".mp3",0)
+    pygame.mixer.Sound("sounds/gun"+str(random.randint(0,4))+".mp3").play()
 
 def placeAngryDudes(gameMap,image,scale,difficulty,howMany):
     floors = findFloors(gameMap)
@@ -776,12 +794,12 @@ while True:
     if gameOrMenu == 11:
         gameOrMenu = 0
         print("you win!")
-        playsound("sounds/win.mp3",0)
+        pygame.mixer.Sound("sounds/win.mp3").play()
     #if the character's health drops to 0 or below
     if gameOrMenu ==99:
         gameOrMenu = 0
         print("you died :(")
-        playsound("sounds/lose.mp3",0)
+        pygame.mixer.Sound("sounds/lose.mp3").play()
 
     #done is always False as nothing changes it
     # every time a room number is returned, this code is ran in order to generate a new grid.     
