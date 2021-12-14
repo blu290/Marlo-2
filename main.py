@@ -1,5 +1,3 @@
-import pygame
-from pygame.locals import*
 import time
 import button
 import sys
@@ -7,6 +5,15 @@ import math
 import random
 import player
 import copy
+try:
+    import pygame
+    #from pygame.locals import*
+except ModuleNotFoundError:
+    print("pygame library not found. in order to play this game pygame is required.\nfor more information on how to get pygame, visit https://pypi.org/project/pygame/ \n ")
+    print("exiting in 10 seconds...")
+    time.sleep(10)
+    sys.exit()
+
 #from playsound import playsound
 #from sys import platform
 #import numpy
@@ -305,11 +312,11 @@ def playMenu(character,difficulty):
     #characters and difficulty       
     if character1Button.draw(gameDisplay) == True:
         #print("character 1 selected")
-        character = player.Person(character1,1,200,150)
+        character = player.Marlo(character1,1,200,150,8,3)
 
     if character2Button.draw(gameDisplay) == True:
         #print("character 2 selected")
-        character = player.Person(character2,1,200,150)
+        character = player.Bogos(character2,1,200,150,1,12)
     if hardButton.draw(gameDisplay) == True:
         #print("hard selected")
         difficulty = 2
@@ -356,8 +363,6 @@ def Menu():
         clock.tick(60)
     return (1,character,difficulty)
 
-
-
 #function for checking if the player is hitting wall:
 def collideTest(rect,tiles):
     collisions = []
@@ -367,7 +372,7 @@ def collideTest(rect,tiles):
     return collisions
 
 #handles the bullet collisions with the wall tiles, for each bullet which has been fired.
-def bulletCollide(bullets,tiles):
+def bulletCollide(bullets,tiles,cameraOffset):
         collisions = []
     #having a weird bug which happens when it intercepts 2 tiles at once 
     # it deletes the entry twice which isn't good
@@ -375,7 +380,7 @@ def bulletCollide(bullets,tiles):
     #try:
         for bullet in bullets[:]:
                 collisionCount = 0
-                bullet.update()
+                bullet.update(cameraOffset)
                 for tile in tiles:
                     if bullet.rect.colliderect(tile):
                         if collisionCount == 0:
@@ -396,7 +401,7 @@ def bulletEnemy(bullets,enemyList):
                     collisions.append(bullet)           #add the bullet to the list if it's collided
                     collisionCount += 1
 
-                if enemy.takeDamage(3):                 #run the method on the enemy to take damage
+                if enemy.takeDamage(bullet.getDamage()):#run the method on the enemy to take damage
                     enemyList.remove(enemy)             #if it's true the enemy died, so it is removed from the list
     for bullet in collisions:                           #remove all collided bullets
         bullets.remove(bullet)
@@ -518,8 +523,8 @@ def createMatrix(gameMap):
 def game(gameMap,character,difficulty,room):
     enemyConstant = 5
     previousRes = (800,600)
+    floors = findFloors(gameMap)
 
-    
     #variable which gets returned
     room += 1
     #setting up text for the HUD
@@ -540,10 +545,6 @@ def game(gameMap,character,difficulty,room):
     pistolImg = pygame.image.load("sprites/pistol.png").convert()
     pistolImg.set_colorkey((255,255,255))
 
-    gunSpriteGroup = pygame.sprite.Group()
-    gun = player.gun(400,300,pistolImg,1)
-    gunSpriteGroup.add(gun)
-
 
     #setting up some variables required for the game
     tileWidth = 32
@@ -562,6 +563,9 @@ def game(gameMap,character,difficulty,room):
     shootDelay = 20
 
     #setting the player's invincibility frames to 0, when it's 30 or above they can take damage
+    gunSpriteGroup = pygame.sprite.Group()
+    gun = player.gun(400,300,pistolImg,1,0,cameraOffset)
+    gunSpriteGroup.add(gun)
 
     #AngryDudes being placed and added to the srite group
     enemySpriteGroup = pygame.sprite.Group()
@@ -586,6 +590,8 @@ def game(gameMap,character,difficulty,room):
 
     distanceFromDoor = (0,0)
 
+    character.newLevel()
+
     #GAME LOOP
     while gameLoop == 1:
         #display scaling things
@@ -606,6 +612,7 @@ def game(gameMap,character,difficulty,room):
         roomNumberText = gameFont.render("room: {}/10".format(room-1),False,(255,255,255))
         enemyText = gameFont.render("enemies: {}".format(len(enemyList)),False,(255,255,255))
         distanceText = gameFont.render("{},{}".format(distanceFromDoor[0],distanceFromDoor[1]),False,(255,255,255))
+        specialText = gameFont.render("special: {}/{}".format(character.getSpecial(),character.getMaxSpecial()),False,(255,255,255))
         movement = [0,0]
         gameDisplay.fill((0,0,0))
         display.fill((32,36,78))
@@ -623,43 +630,35 @@ def game(gameMap,character,difficulty,room):
 ##### |_|_| |_| .__/ \__,_|\__|___/
 #####         | |                    
 #####         |_|                    
+        mousePressed = pygame.mouse.get_pressed()
+        if mousePressed[0]:                                           #when the mouse button is pressed
+            if shootDelay>=20:                                                      #if the bullet is ready to be fired
+                shootSound()
+                bullet = player.Bullet(screenSizeX/2,screenSizeY/2,character.damage,cameraOffset)#create a bullet object and put it in a list
+                bullets.append(bullet)
+                shootDelay = 0                                                      #reset it so its not ready to fire.
+        shootDelay += 1
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:                               #when the mouse button is pressed
-                if shootDelay>=20:                                                 #if the bullet is ready to be fired
-                    shootSound()
-                    #playsound('sounds/gun0.mp3',0)
-                    bullet = player.Bullet(screenSizeX/2,screenSizeY/2,)           #create a bullet object and put it in a list
-                    bullets.append(bullet)
-                    shootDelay = 0                                                 #reset it so its not ready to fire.
-        shootDelay += 1
+            if mousePressed[2]:
+                cameraOffset = character.ability(cameraOffset,currentRes,floors)
+
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
             movement[0]-=(3)
-            for bullet in bullets[:]:
-                temp = bullet.pos
-                bullet.pos =(temp[0]+3,temp[1])
 
         if keys[pygame.K_d]:
             movement[0]+=(3)
-            for bullet in bullets[:]:
-                temp = bullet.pos
-                bullet.pos =(temp[0]-3,temp[1])
-
+    
         if keys[pygame.K_w]:
             movement[1]-=(3)
-            for bullet in bullets[:]:
-                temp = bullet.pos
-                bullet.pos =(temp[0],temp[1]+3)
-
+            
         if keys[pygame.K_s]:
             movement[1]+=(3)
-            for bullet in bullets[:]:
-                temp = bullet.pos
-                bullet.pos =(temp[0],temp[1]-3)
+            
         display.fill((0,0,0))
 
         #temporary, press p to take damage, in order to test that the health system works
@@ -708,7 +707,7 @@ def game(gameMap,character,difficulty,room):
             life.updatePosition(cameraOffset)
 
         #bullet interactions and logic in main loop
-        bulletCollide(bullets,tilesRects)
+        bulletCollide(bullets,tilesRects,cameraOffset)
         bulletEnemy(bullets,enemyList)
         playerHit(character,enemyList)
         playerHeal(character,lifeList)
@@ -731,6 +730,7 @@ def game(gameMap,character,difficulty,room):
         display.blit(roomNumberText,(0,15))
         display.blit(enemyText,(screenSizeX/2 - 100 ,0))
         display.blit(distanceText, (screenSizeX/2 - 100,15))
+        display.blit(specialText,(0,30))
         
         movement[0],movement[1] = move(character.rect,movement,tilesRects)
         cameraOffset[0] +=movement[0]
@@ -742,7 +742,7 @@ def game(gameMap,character,difficulty,room):
         enemySpriteGroup.draw(display)
         lifeSpriteGroup.draw(display)
         #gunSpriteGroup.draw(display)
-
+        character.increment()
 #break loop conditions
         #collisions between the door and player when the door is unlocked:
         if doorHitbox.colliderect(character.rect) and enemyCount == 0:

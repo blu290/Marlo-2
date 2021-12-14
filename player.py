@@ -1,15 +1,26 @@
 import pygame
 import math
+import time
+import sys
 import random
-from pathfinding.core.diagonal_movement import DiagonalMovement
-from pathfinding.core.grid import Grid
-from pathfinding.finder.a_star import AStarFinder
-from pygame.constants import NOEVENT
+try:
+  from pathfinding.core.diagonal_movement import DiagonalMovement
+  from pathfinding.core.grid import Grid
+  from pathfinding.finder.a_star import AStarFinder
+  from pygame.constants import NOEVENT
+except ModuleNotFoundError:
+    print("pathfinding library not found. in order to play this game pathfinding is required.\n for more information on how to get pathfinding, visit https://pypi.org/project/pathfinding/ \n ")
+    print("exiting in 10 seconds...")
+    time.sleep(10)
+    sys.exit()
 #import numpy
 
-class Person(pygame.sprite.Sprite):
-  def __init__(self,image,scale,x,y):
+class Marlo(pygame.sprite.Sprite):
+  def __init__(self,image,scale,x,y,health,damage):
     super().__init__()
+    self.name = "marlo"
+    self.special = 0
+    self.maxSpecial = 3
     width = image.get_width()
     height = image.get_height()
     self.image = image
@@ -17,9 +28,12 @@ class Person(pygame.sprite.Sprite):
     self.rect = self.image.get_rect()
     self.rect.x = x
     self.rect.y = y
-    self.maxHealth = 8
+    self.maxHealth = health
     self.health = self.maxHealth
     self.invincibilityFrames = 30
+    self.damage = damage
+    self.specialTicks = 240
+    self.specialReady = 240
   
   def getTile(self,cameraOffset,resolution):
     self.tile = ((cameraOffset[0]+8)/32 + (resolution[0])/128), ((cameraOffset[1]+8)/32  + (resolution[1])/128) #formula for calculating currentTile
@@ -29,6 +43,15 @@ class Person(pygame.sprite.Sprite):
     self.rect.x = x
     self.rect.y = y
   
+  def getSpecial(self):
+    return self.special
+  
+  def getMaxSpecial(self):
+    return self.maxSpecial
+
+  def newLevel(self):
+    self.invincibilityFrames = -60
+
   def fullHealth(self):
     if self.maxHealth == self.health:
       return 1
@@ -52,12 +75,53 @@ class Person(pygame.sprite.Sprite):
       self.invincibilityFrames = 0
       return 1
     return 0
+  
+  def increment(self):
+    self.specialTicks += 1
 
   def heal(self,heal):
     self.health += heal
     if self.health > self.maxHealth:
       self.health = self.maxHealth
-    
+
+  def getName(self):
+    return self.name
+
+  def ability(self,cameraOffset,resolution,floors):
+    return cameraOffset
+
+class Bogos(Marlo):
+  def __init__(self,image,scale,x,y,health,damage):
+    super().__init__(image,scale,x,y,health,damage)
+    self.name = "bogos"
+    self.special = 3
+  
+  def fullHealth(self):
+    if self.special >= self.maxSpecial:
+      return True
+    return False
+
+  def ability(self,cameraOffset,resolution,floors):
+    if self.special > 0:
+      if self.specialTicks >= self.specialReady:
+        mx, my = pygame.mouse.get_pos()
+        x = int(-resolution[0]/4 + mx/2)
+        y = int(-resolution[1]/4 + my/2)
+        tile = self.getTile(cameraOffset,resolution)
+        mouseTile = (int(tile[1]+y/32),int(tile[0]+x/32))
+        if mouseTile in floors:
+          cameraOffset = [cameraOffset[0] + x,cameraOffset[1] + y]
+          pygame.mixer.Sound("sounds/bogos.mp3").play()
+          self.special -= 1
+          self.specialTicks = 0
+    return cameraOffset
+
+  def heal(self,heal):                         #health won't heal bogos, it will instead recharge his teleporter
+    self.special += 1
+    if self.special > self.maxSpecial:
+      self.special = self.maxSpecial
+
+
 class life(pygame.sprite.Sprite):
   def __init__(self,image,scale,tilex,tiley):
     super().__init__()
@@ -195,9 +259,15 @@ class angrydude(pygame.sprite.Sprite):
 #weapons
   
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y,damage,cameraOffset):
         super().__init__()
-        self.pos = (x/2, y/2)
+        blue = (125,249,255)
+        white = (255,255,255)
+        if damage > 10:
+          color = blue
+        else:
+          color = white
+        self.pos = (x/2 + 8, y/2 + 8)
         mx, my = pygame.mouse.get_pos()
         self.dir = (mx - x, my - y)
         length = math.hypot(*self.dir)
@@ -208,29 +278,32 @@ class Bullet(pygame.sprite.Sprite):
         angle = math.degrees(math.atan2(-self.dir[1], self.dir[0]))
 
         self.bullet = pygame.Surface((10, 4)).convert_alpha()
-        self.bullet.fill((255, 255, 255))
+        self.bullet.fill(color)
         self.bullet = pygame.transform.rotate(self.bullet, angle)
         self.speed = 15
         self.rect = self.bullet.get_rect(center = self.pos)
         self.rect.x = x
         self.rect.y = y
-        self.bulletDamage = 3
+        self.bulletDamage = damage
+        self.initialx = cameraOffset[0]
+        self.initialy = cameraOffset[1]
     
-    def bulletDamage(self):
+    def getDamage(self):
       return self.bulletDamage
 
-    def update(self):  
-        self.pos = (self.pos[0]+(self.dir[0]*self.speed), 
-                    self.pos[1]+(self.dir[1]*self.speed))
+    def update(self,cameraOffset):  
+        self.pos = (self.pos[0]+(self.dir[0]*self.speed)-cameraOffset[0] + self.initialx, self.pos[1]+(self.dir[1]*self.speed) - cameraOffset[1] + self.initialy)
         self.rect = self.bullet.get_rect(center = self.pos)
+        self.initialx = cameraOffset[0]
+        self.initialy = cameraOffset[1]
 
     def draw(self, surf,camera):
         bullet_rect = self.bullet.get_rect(center = self.pos)
         surf.blit(self.bullet, (bullet_rect))
 
 class gun(Bullet):
-  def __init__(self,x, y,image,scale):
-        super().__init__(x,y)
+  def __init__(self,x, y,image,scale,damage,cameraOffset):
+        super().__init__(x,y,damage,cameraOffset)
         self.originalImage = image
         width = image.get_width()
         height = image.get_height()
