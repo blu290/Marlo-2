@@ -198,6 +198,10 @@ class angrydude(pygame.sprite.Sprite):
       searching = True                                                          #start searching
     while searching:
       y,x = int(playerTile[0]),int(playerTile[1])                               #define target's coordinates
+      if y >= 60 or x >= 60:
+        break
+      if tile[0] >= 60 or tile[1] >=60:
+        break
       self.grid = Grid(matrix=matrix)                                           #create matrix for A*,using grid
       self.start = self.grid.node(int(tile[0]),int(tile[1]))                    #define the startpoint
       self.end = self.grid.node(y,x)                                            #use target coordinate as endpoint
