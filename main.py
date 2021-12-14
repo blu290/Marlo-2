@@ -217,8 +217,8 @@ goBackButton2 = button.Button(20,500,goBackButtonImg,0.25)
 
 #play button menu objects:
 #characters and difficulty buttons
-c2Img = pygame.image.load("buttons/Character 2.png").convert()
-c1Img = pygame.image.load("buttons/Character1.png").convert()
+c2Img = pygame.image.load("buttons/Bogos.png").convert()
+c1Img = pygame.image.load("buttons/Marlo.png").convert()
 character2Button = button.Button(200,500,c2Img,0.25)
 character1Button = button.Button(10,500,c1Img,0.25)
 
