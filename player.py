@@ -183,8 +183,9 @@ class angrydude(pygame.sprite.Sprite):
   
   def getTile(self,player,cameraOffset,resolution):
     playerTile = player.getTile(cameraOffset,resolution)
-    tileDistance = ((self.rect.x+8)/32 - resolution[0]/128), ((self.rect.y+8)/32 - resolution[1]/128)
-    self.tile = (int(playerTile[0] + tileDistance[0]), int(playerTile[1]+ tileDistance[1]))
+    tileDistance = ((self.rect.x)/32 - resolution[0]/128), ((self.rect.y)/32 - resolution[1]/128)
+    self.realTile = [float(playerTile[0] + tileDistance[0]), float(playerTile[1]+ tileDistance[1])]
+    self.tile = [int(playerTile[0] + tileDistance[0]), int(playerTile[1]+ tileDistance[1])]
     return self.tile
   
   def updateTicks(self):
@@ -217,15 +218,19 @@ class angrydude(pygame.sprite.Sprite):
       searching = False                                                         #end the loop
   
   def updatePath(self):
-    if self.targetCoordinates[0] == None or self.targetCoordinates[1] == None or (self.tile == self.targetCoordinates): #if no valid next move:
+    if self.tile == self.targetCoordinates:
+      targetreal = (self.realTile[0]-self.tile[0],self.realTile[1]-self.tile[1])
+      print(targetreal)
+    if self.targetCoordinates[0] == None or self.targetCoordinates[1] == None or self.tile ==self.targetCoordinates:  #if no valid next move:
+      #print(self.targetCoordinates,self.tile)
       if len(self.path) > 0:                                                                                          #check if there's a next move to make
-        self.targetCoordinates = self.path.pop(0)
+        self.targetCoordinates = list(self.path.pop(0))
       else:
         return 0                                                                                                      #if there isn't then default to the old one
     if self.path == []:
       self.targetCoordinates =self.tile
       return 0
-    self.movex = -(self.speed*(self.targetCoordinates[0] - self.tile[0]))                                            #update the distance that needs to be travelled
+    self.movex = -(self.speed*(self.targetCoordinates[0] - self.tile[0]))                                             #update the distance that needs to be travelled
     self.movey = -(self.speed*(self.targetCoordinates[1] - self.tile[1]))
     return 1
 

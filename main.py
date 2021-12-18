@@ -520,9 +520,19 @@ def createMatrix(gameMap):
                 matrix[y][x] = 0        #make it an obsticle. 
     return matrix
 
+def placePlayer(floors,resolution):
+    cameraOffset = [0,0]
+    floor = floors[random.randint(0,len(floors)-1)]
+    cameraOffset[1] = 32*floor[0] +8 - resolution[1]/4
+    cameraOffset[0] = 32*floor[1] +8 - resolution[0]/4
+    return cameraOffset
+
+
 def game(gameMap,character,difficulty,room):
-    enemyConstant = 5
-    previousRes = (800,600)
+    enemyConstant = 1
+    currentRes = gameDisplay.get_size()
+    previousRes = currentRes
+
     floors = findFloors(gameMap)
 
     #variable which gets returned
@@ -548,14 +558,12 @@ def game(gameMap,character,difficulty,room):
 
     #setting up some variables required for the game
     tileWidth = 32
-    cameraOffset = [24*tileWidth,26*tileWidth]
+    cameraOffset = placePlayer(floors,currentRes)
+    #cameraOffset = [24*tileWidth,26*tileWidth]
     gameLoop = 1
 
     #adding a door to the game
     doorLocation(gameMap)
-
-    #declare surface
-    display = pygame.Surface((400,300))
 
     #create a list for the hitbox for walls, as well as bullets. declare the shootdelay to be 20 which allows the gun to be instantly fired. 
     tilesRects = []
