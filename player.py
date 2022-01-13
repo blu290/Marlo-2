@@ -34,6 +34,7 @@ class Marlo(pygame.sprite.Sprite):
     self.damage = damage
     self.specialTicks = 240
     self.specialReady = 240
+    self.healthincrease = 4
   
   def getTile(self,cameraOffset,resolution):
     self.tile = ((cameraOffset[0]+8)/32 + (resolution[0])/128), ((cameraOffset[1]+8)/32  + (resolution[1])/128) #formula for calculating currentTile
@@ -52,11 +53,23 @@ class Marlo(pygame.sprite.Sprite):
   def newLevel(self):
     self.invincibilityFrames = -60
 
+  def increaseSpecial(self,heal):
+    self.special += 1
+    self.healthincrease = heal
+    if self.special > self.maxSpecial:
+      self.special = self.maxSpecial
+
   def fullHealth(self):
     if self.maxHealth == self.health:
       return 1
     else:
       return 0
+
+  def fullSpecial(self):
+    if self.special >= self.maxSpecial:
+      return True
+    return False
+
   def moveright(self, pixels):
     self.rect.x += pixels
 
@@ -88,6 +101,13 @@ class Marlo(pygame.sprite.Sprite):
     return self.name
 
   def ability(self,cameraOffset,resolution,floors):
+    if self.special > 0:                            #standard check
+      if self.specialTicks >= self.specialReady:
+        self.special -= 1
+        self.health += self.healthincrease          #standard health increase
+        self.specialTicks = 0
+        if self.health > self.maxHealth:
+          self.health = self.maxHealth
     return cameraOffset
 
 class Bogos(Marlo):
@@ -96,23 +116,23 @@ class Bogos(Marlo):
     self.name = "bogos"
     self.special = 3
   
-  def fullHealth(self):
-    if self.special >= self.maxSpecial:
-      return True
-    return False
+  #def fullHealth(self):
+    #if self.special >= self.maxSpecial:
+      #return True
+    #return False
 
   def ability(self,cameraOffset,resolution,floors):
-    if self.special > 0:
-      if self.specialTicks >= self.specialReady:
-        mx, my = pygame.mouse.get_pos()
+    if self.special > 0:                                            #perform checks
+      if self.specialTicks >= self.specialReady:                
+        mx, my = pygame.mouse.get_pos()                             #get mouse position
         x = int(-resolution[0]/4 + mx/2)
-        y = int(-resolution[1]/4 + my/2)
-        tile = self.getTile(cameraOffset,resolution)
-        mouseTile = (int(tile[1]+y/32),int(tile[0]+x/32))
-        if mouseTile in floors:
-          cameraOffset = [cameraOffset[0] + x,cameraOffset[1] + y]
+        y = int(-resolution[1]/4 + my/2)                            #calculate vector based on displacement between player and mouse
+        tile = self.getTile(cameraOffset,resolution)                
+        mouseTile = (int(tile[1]+y/32),int(tile[0]+x/32))           #find what tile it's on
+        if mouseTile in floors:                                     #check if valid tile
+          cameraOffset = [cameraOffset[0] + x,cameraOffset[1] + y]  #if it is then make the player go to the new tile
           pygame.mixer.Sound("sounds/bogos.mp3").play()
-          self.special -= 1
+          self.special -= 1                                         #remove 1 special and reset ticks
           self.specialTicks = 0
     return cameraOffset
 
@@ -167,6 +187,7 @@ class angrydude(pygame.sprite.Sprite):
     self.path = []
     self.targetCoordinates = (None,None)
     self.pathfindTicks = howMany +1
+    self.type = "angrydude"
     if difficulty == 2:
       self.health = 12
       self.damage = 4
@@ -176,11 +197,13 @@ class angrydude(pygame.sprite.Sprite):
       self.damage = 2
       self.speed = 2
 
-    
     #pathfinding setup
     #self.currentTileX = tilex
     #self.currentTileY = tiley
   
+  def getType(self):
+    return self.type
+    
   def getTile(self,player,cameraOffset,resolution):
     playerTile = player.getTile(cameraOffset,resolution)
     tileDistance = ((self.rect.x)/32 - resolution[0]/128), ((self.rect.y)/32 - resolution[1]/128)
@@ -219,8 +242,8 @@ class angrydude(pygame.sprite.Sprite):
   
   def updatePath(self):
     if self.tile == self.targetCoordinates:
-      targetreal = (self.realTile[0]-self.tile[0],self.realTile[1]-self.tile[1])
-      print(targetreal)
+      currentReal = (self.realTile[0]-self.tile[0],self.realTile[1]-self.tile[1])
+      
     if self.targetCoordinates[0] == None or self.targetCoordinates[1] == None or self.tile ==self.targetCoordinates:  #if no valid next move:
       #print(self.targetCoordinates,self.tile)
       if len(self.path) > 0:                                                                                          #check if there's a next move to make
@@ -265,7 +288,19 @@ class angrydude(pygame.sprite.Sprite):
     else:
       return False
     
-#weapons
+class Ghost(angrydude):
+  def __init__(self,image,scale,difficulty,tilex,tiley,map,number,howMany):
+    super().__init__(image,scale,difficulty,tilex,tiley,map,number,howMany)
+    self.type = "ghost"
+    if difficulty == 2:
+      self.health = 6
+      self.damage = 2
+      self.speed = 1.5
+    else:
+      self.health = 3
+      self.damage = 1
+      self.speed = 1.5
+
   
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y,damage,cameraOffset):

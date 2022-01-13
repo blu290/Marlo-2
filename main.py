@@ -241,6 +241,11 @@ character2.set_colorkey((255,255,255))
 #loading item pickup images
 healthImage = pygame.image.load("sprites/life.png").convert()
 healthImage.set_colorkey((255,255,255))
+
+#ghosts sprite
+ghostImage = pygame.image.load("sprites/ghost.png").convert()
+ghostImage.set_colorkey((255,255,255))
+
 ##### MENU functions #####
 whatMenu = int(0)
 
@@ -317,6 +322,7 @@ def playMenu(character,difficulty):
     if character2Button.draw(gameDisplay) == True:
         #print("character 2 selected")
         character = player.Bogos(character2,1,200,150,1,12)
+
     if hardButton.draw(gameDisplay) == True:
         #print("hard selected")
         difficulty = 2
@@ -447,14 +453,15 @@ def playerHit(character,enemyList):
             if character.takeDamage(enemy.damage) ==1:
                 pygame.mixer.Sound("sounds/damage.mp3").play()
 
-def playerHeal(character,lifeList):
-    if character.fullHealth():
+def abilityPickup(character,lifeList):                    
+    if character.fullSpecial():                             #check if max special
         return 0
     else:
-        for life in lifeList:
-            if character.rect.colliderect(life):
-                character.heal(life.getHeal())
-                lifeList.remove(life)
+        for life in lifeList:                               #loop through the list of ability pickups
+            if character.rect.colliderect(life):            #if colliding
+                character.increaseSpecial(life.getHeal())   #increase character's special + kill the pickup
+                #character.heal(life.getHeal())
+                lifeList.remove(life)                       #remove from the list
 
 def doorLocation(grid):
     notPicked = True
@@ -497,6 +504,20 @@ def placeAngryDudes(gameMap,image,scale,difficulty,howMany):
         enemyList.append(enemy)
     return (enemyList)
 
+def placeGhosts(gameMap,image,scale,difficulty,howMany,enemyList):
+    floors = findFloors(gameMap)
+    #if more enemies than floor tiles then equate them
+    if howMany > len(floors)-1:
+        howMany = (len(floors) -1)
+    for i in range(howMany):#len(floors)-1):
+        floor = random.randint(0,len(floors)-1) #pick a random index24
+        coordinates = floors[floor] #coordinates of the floor tile
+        floors.pop(floor)
+        y,x = coordinates[0],coordinates[1]
+        enemy =  player.Ghost(image,scale,difficulty,x,y,gameMap,i,howMany)
+        enemyList.append(enemy)
+    return (enemyList)
+
 def placeLife(gameMap,image,scale,howMany):
     floors = findFloors(gameMap)
     if howMany > len(floors) - 1:
@@ -529,7 +550,7 @@ def placePlayer(floors,resolution):
 
 
 def game(gameMap,character,difficulty,room):
-    enemyConstant = 1
+    enemyConstant = 5
     currentRes = gameDisplay.get_size()
     previousRes = currentRes
 
@@ -578,6 +599,7 @@ def game(gameMap,character,difficulty,room):
     #AngryDudes being placed and added to the srite group
     enemySpriteGroup = pygame.sprite.Group()
     enemyList = placeAngryDudes(gameMap,angrydudeimg,1,difficulty,enemyConstant*(room-1))
+    enemyList = placeGhosts(gameMap,ghostImage,1,difficulty,random.randint(room,room*5),enemyList)
     for i in range(len(enemyList)):
         enemySpriteGroup.add(enemyList[i])
 
@@ -637,14 +659,16 @@ def game(gameMap,character,difficulty,room):
 ##### | | | | | |_) | |_| | |_\__ \
 ##### |_|_| |_| .__/ \__,_|\__|___/
 #####         | |                    
-#####         |_|                    
+#####         |_|              
+
+
         mousePressed = pygame.mouse.get_pressed()
-        if mousePressed[0]:                                           #when the mouse button is pressed
-            if shootDelay>=20:                                                      #if the bullet is ready to be fired
+        if mousePressed[0]:                                                                         #when the mouse button is pressed
+            if shootDelay>=20:                                                                      #if the bullet is ready to be fired
                 shootSound()
-                bullet = player.Bullet(screenSizeX/2,screenSizeY/2,character.damage,cameraOffset)#create a bullet object and put it in a list
+                bullet = player.Bullet(screenSizeX/2,screenSizeY/2,character.damage,cameraOffset)   #create a bullet object and put it in a list
                 bullets.append(bullet)
-                shootDelay = 0                                                      #reset it so its not ready to fire.
+                shootDelay = 0                                                                      #reset it so its not ready to fire.
         shootDelay += 1
 
         for event in pygame.event.get():
@@ -718,16 +742,20 @@ def game(gameMap,character,difficulty,room):
         bulletCollide(bullets,tilesRects,cameraOffset)
         bulletEnemy(bullets,enemyList)
         playerHit(character,enemyList)
-        playerHeal(character,lifeList)
+        abilityPickup(character,lifeList)
 
         #pathfinding
         for badguy in enemyList:
-            badguy.updateTicks()
-            badguy.pathfind(character.getTile(cameraOffset,(screenSizeX,screenSizeY)),matrix,badguy.getTile(character,cameraOffset,(screenSizeX,screenSizeY)))
-            if badguy.updatePath() == 0:
+            if badguy.getType() == "angrydude":
+                badguy.updateTicks()
+                badguy.pathfind(character.getTile(cameraOffset,(screenSizeX,screenSizeY)),matrix,badguy.getTile(character,cameraOffset,(screenSizeX,screenSizeY)))
+                if badguy.updatePath() == 0:
+                    badguy.updatePosition(cameraOffset,(badguy.chasePlayer(character)))
+                elif badguy.updatePath() == 1:
+                    badguy.updatePosition(cameraOffset,(badguy.movex,badguy.movey))
+
+            elif badguy.getType() == "ghost":
                 badguy.updatePosition(cameraOffset,(badguy.chasePlayer(character)))
-            elif badguy.updatePath() == 1:
-                badguy.updatePosition(cameraOffset,(badguy.movex,badguy.movey))
 
         #
         for bullet in bullets:
