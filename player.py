@@ -35,7 +35,36 @@ class Marlo(pygame.sprite.Sprite):
     self.specialTicks = 240
     self.specialReady = 240
     self.healthincrease = 4
+    self.shootFrames = 20
+    self.shootCooldown = self.shootFrames
+    self.bulletPenetration = 1
   
+  def SUPERMARLO(self):
+    self.damage = 666
+    self.specialReady = 20
+    self.specialTicks = 20
+    self.bulletPenetration = 666
+    self.special = 666
+    self.maxSpecial = 666
+    self.health = 666
+    self.maxHealth = 666
+    self.shootFrames = 0
+
+  def getPen(self):
+    return self.bulletPenetration
+
+  def getShootFrames(self):
+    return self.shootFrames
+
+  def getShootCooldown(self):
+    return self.shootCooldown
+
+  def updateShootFrames(self):
+    self.shootCooldown += 1
+  
+  def resetShootDelay(self):
+    self.shootCooldown = 0
+
   def getTile(self,cameraOffset,resolution):
     self.tile = ((cameraOffset[0]+8)/32 + (resolution[0])/128), ((cameraOffset[1]+8)/32  + (resolution[1])/128) #formula for calculating currentTile
     return self.tile
@@ -97,17 +126,34 @@ class Marlo(pygame.sprite.Sprite):
     if self.health > self.maxHealth:
       self.health = self.maxHealth
 
+  def increaseMaxHealth(self):
+    self.maxHealth += 2
+    self.health += 2
+  
+  def increaseFireRate(self):
+    self.shootFrames -= 2
+  
+  def increaseDamage(self):
+    if self.damage >= 12:
+      self.bulletPenetration += 1
+    else:
+      self.damage += 2
+  
+  def increaseMaxSpecial(self):
+    self.maxSpecial += 1
+
   def getName(self):
     return self.name
 
   def ability(self,cameraOffset,resolution,floors):
     if self.special > 0:                            #standard check
       if self.specialTicks >= self.specialReady:
-        self.special -= 1
-        self.health += self.healthincrease          #standard health increase
-        self.specialTicks = 0
-        if self.health > self.maxHealth:
-          self.health = self.maxHealth
+        if self.health == self.maxhealth:
+          self.special -= 1
+          self.health += self.healthincrease          #standard health increase
+          self.specialTicks = 0
+          if self.health > self.maxHealth:
+            self.health = self.maxHealth
     return cameraOffset
 
 class Bogos(Marlo):
@@ -166,6 +212,30 @@ class life(pygame.sprite.Sprite):
     self.kill()
     return self.heal
   
+class upgrade(pygame.sprite.Sprite):
+  #initialising class
+  def __init__(self,image,scale,tilex,tiley):                                         
+    super().__init__()
+    width = image.get_width()
+    height = image.get_height()
+    self.originalImage = image
+    self.image = image
+    self.image = pygame.transform.scale(image,(int(width*scale),int(height*scale)))
+    self.rect = self.image.get_rect()
+    self.rect.x = tilex*32
+    self.rect.y = tiley*32
+    self.startx = tilex
+    self.starty = tiley
+    self.type = random.randint(1,4)
+
+  def updatePosition(self,cameraOffset):
+    self.rect.x = (self.startx)*32 - cameraOffset[0]
+    self.rect.y = (self.starty)*32 - cameraOffset[1]
+
+  #the different options
+  def getType(self):
+    self.kill()
+    return self.type
 
 class angrydude(pygame.sprite.Sprite):
   def __init__(self,image,scale,difficulty,tilex,tiley,map,number,howMany):
@@ -303,11 +373,14 @@ class Ghost(angrydude):
 
   
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y,damage,cameraOffset):
+    def __init__(self, x, y,damage,cameraOffset,penetration):
         super().__init__()
         blue = (125,249,255)
         white = (255,255,255)
-        if damage > 10:
+        red = (255,0,0)
+        if damage >= 666:
+          color = red
+        elif damage >= 12:
           color = blue
         else:
           color = white
@@ -331,9 +404,18 @@ class Bullet(pygame.sprite.Sprite):
         self.bulletDamage = damage
         self.initialx = cameraOffset[0]
         self.initialy = cameraOffset[1]
+        self.health = penetration
     
+    def getHealth(self):
+      return self.health
+
     def getDamage(self):
       return self.bulletDamage
+    
+    def takeDamage(self):
+      self.health -= 1
+      if self.health == 0:
+        self.kill()
 
     def update(self,cameraOffset):  
         self.pos = (self.pos[0]+(self.dir[0]*self.speed)-cameraOffset[0] + self.initialx, self.pos[1]+(self.dir[1]*self.speed) - cameraOffset[1] + self.initialy)
@@ -347,7 +429,7 @@ class Bullet(pygame.sprite.Sprite):
 
 class gun(Bullet):
   def __init__(self,x, y,image,scale,damage,cameraOffset):
-        super().__init__(x,y,damage,cameraOffset)
+        super().__init__(x,y,damage,cameraOffset,1)
         self.originalImage = image
         width = image.get_width()
         height = image.get_height()

@@ -5,6 +5,7 @@ import math
 import random
 import player
 import copy
+import os
 try:
     import pygame
     #from pygame.locals import*
@@ -409,8 +410,11 @@ def bulletEnemy(bullets,enemyList):
 
                 if enemy.takeDamage(bullet.getDamage()):#run the method on the enemy to take damage
                     enemyList.remove(enemy)             #if it's true the enemy died, so it is removed from the list
+
     for bullet in collisions:                           #remove all collided bullets
-        bullets.remove(bullet)
+        bullet.takeDamage()
+        if bullet.getHealth() == 0:
+            bullets.remove(bullet)
 
 #handles the movement of the player and camera when 
 def move(rect, movement, tiles):
@@ -462,6 +466,20 @@ def abilityPickup(character,lifeList):
                 character.increaseSpecial(life.getHeal())   #increase character's special + kill the pickup
                 #character.heal(life.getHeal())
                 lifeList.remove(life)                       #remove from the list
+
+def upgradePickup(character,upgradelist):
+    for upgrade in upgradelist:
+        if character.rect.colliderect(upgrade):
+            upgradeType = upgrade.getType()
+            if upgradeType == 1:
+                character.increaseMaxHealth()
+            elif upgradeType == 2:
+                character.increaseFireRate()
+            elif upgradeType == 3:
+                character.increaseDamage()
+            elif upgradeType == 4:
+                character.increaseMaxSpecial()
+            upgradelist.remove(upgrade)
 
 def doorLocation(grid):
     notPicked = True
@@ -530,8 +548,22 @@ def placeLife(gameMap,image,scale,howMany):
         y,x = coordinates[0],coordinates[1]
         life = player.life(image,scale,x,y)
         lifeList.append(life)
+    return lifeList
 
-    return (lifeList)
+def placeUpgradeBoxes(gameMap,image,scale,howMany):
+    floors = findFloors(gameMap)
+    if howMany > len(floors) - 1:
+        howMany = len(floors) - 1
+    upgradeBoxList = []
+    for i in range(howMany):
+        floor = random.randint(0,len(floors)-1)
+        coordinates = floors[floor]
+        floors.pop(floor)
+        y,x = coordinates[0],coordinates[1]
+        upgrade = player.upgrade(image,scale,x,y)
+        upgradeBoxList.append(upgrade)
+
+    return (upgradeBoxList)
 
 def createMatrix(gameMap):
     matrix = gameMap
@@ -599,7 +631,7 @@ def game(gameMap,character,difficulty,room):
     #AngryDudes being placed and added to the srite group
     enemySpriteGroup = pygame.sprite.Group()
     enemyList = placeAngryDudes(gameMap,angrydudeimg,1,difficulty,enemyConstant*(room-1))
-    enemyList = placeGhosts(gameMap,ghostImage,1,difficulty,random.randint(room,room*5),enemyList)
+    enemyList = placeGhosts(gameMap,ghostImage,1,difficulty,random.randint(0,room),enemyList)
     for i in range(len(enemyList)):
         enemySpriteGroup.add(enemyList[i])
 
@@ -614,11 +646,21 @@ def game(gameMap,character,difficulty,room):
     for life in lifeList:
         lifeSpriteGroup.add(life)
 
+    #place the upgrade boxes
+    upgradeImage = pygame.image.load("sprites/upgrade.png").convert()
+    upgradeImage.set_colorkey((255,255,255))
+    upgradeBoxList = placeUpgradeBoxes(gameMap,upgradeImage,1,1)
+    upgradeSpriteGroup = pygame.sprite.Group()
+    for upgrade in upgradeBoxList:
+        upgradeSpriteGroup.add(upgrade)
+
     #generate the matrix for the map, used for pathfinding
     gameMap2 = copy.deepcopy(gameMap)
     matrix = createMatrix(gameMap2)
 
     distanceFromDoor = (0,0)
+    if os.path.isfile("SUPERMARLO"):
+        character.SUPERMARLO()
 
     character.newLevel()
 
@@ -638,7 +680,7 @@ def game(gameMap,character,difficulty,room):
         display = pygame.Surface((screenSizeX/2,screenSizeY/2))
 
 
-        healthText = gameFont.render("HP: {}".format(character.health),False,(255,255,255))
+        healthText = gameFont.render("HP: {} / {}".format(character.health,character.maxHealth),False,(255,255,255))
         roomNumberText = gameFont.render("room: {}/10".format(room-1),False,(255,255,255))
         enemyText = gameFont.render("enemies: {}".format(len(enemyList)),False,(255,255,255))
         distanceText = gameFont.render("{},{}".format(distanceFromDoor[0],distanceFromDoor[1]),False,(255,255,255))
@@ -660,16 +702,17 @@ def game(gameMap,character,difficulty,room):
 ##### |_|_| |_| .__/ \__,_|\__|___/
 #####         | |                    
 #####         |_|              
-
+        character.updateShootFrames()
 
         mousePressed = pygame.mouse.get_pressed()
         if mousePressed[0]:                                                                         #when the mouse button is pressed
-            if shootDelay>=20:                                                                      #if the bullet is ready to be fired
+            if character.getShootCooldown()>=character.getShootFrames():                            #if the bullet is ready to be fired
                 shootSound()
-                bullet = player.Bullet(screenSizeX/2,screenSizeY/2,character.damage,cameraOffset)   #create a bullet object and put it in a list
+                bullet = player.Bullet(screenSizeX/2,screenSizeY/2,character.damage,cameraOffset,character.getPen())   #create a bullet object and put it in a list
                 bullets.append(bullet)
-                shootDelay = 0                                                                      #reset it so its not ready to fire.
-        shootDelay += 1
+                character.resetShootDelay()                                                         #reset it so its not ready to fire.
+        
+        
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -738,11 +781,15 @@ def game(gameMap,character,difficulty,room):
         for life in lifeList:
             life.updatePosition(cameraOffset)
 
+        for upgrade in upgradeBoxList:
+            upgrade.updatePosition(cameraOffset)
+
         #bullet interactions and logic in main loop
         bulletCollide(bullets,tilesRects,cameraOffset)
         bulletEnemy(bullets,enemyList)
         playerHit(character,enemyList)
         abilityPickup(character,lifeList)
+        upgradePickup(character,upgradeBoxList)
 
         #pathfinding
         for badguy in enemyList:
@@ -777,6 +824,7 @@ def game(gameMap,character,difficulty,room):
         characterSpriteGroup.draw(display)
         enemySpriteGroup.draw(display)
         lifeSpriteGroup.draw(display)
+        upgradeSpriteGroup.draw(display)
         #gunSpriteGroup.draw(display)
         character.increment()
 #break loop conditions
