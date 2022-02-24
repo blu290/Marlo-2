@@ -1,3 +1,4 @@
+from doctest import master
 import time
 import button
 import sys
@@ -6,6 +7,8 @@ import random
 import player
 import copy
 import os
+import json
+import math
 try:
     import pygame
     #from pygame.locals import*
@@ -138,7 +141,106 @@ def placeWalls(grid):
                         grid[y][x-1] = 2
     return(grid)
 
+def convertTime(seconds):
+    #if less than 2 minutes, show in seconds
+    if seconds // 60 >= 2:
+        minutes = seconds/60
+    else:
+        return str(int(seconds))+" seconds"
+    #if less than 2 hours, show in minutes
+    if minutes // 60 >= 2:
+        hours = minutes/60
+    else:
+        return str(int(minutes))+" minutes"
+    #default to showing in hours
+    return str(int(hours))+" hours"
 
+def updatePlayTime(playTime):
+    data = json.load(open("config.json"))           #open the file, grab contents
+    open("config.json").close()                     #close it
+    for i in data["stats"]:                         #look for playtime
+        if i["type"] == "playTime":
+            playTime += i["value"]
+    data["stats"][0]["value"] = playTime            #add the total playtime with the time they just played now
+    with open("config.json","w") as file:           #rewrite the entire file with the new contents
+        json.dump(data,file,indent=2)
+
+
+def updateWins():
+    #pull all data
+    data = json.load(open("config.json"))
+    open("config.json").close()
+    #increment correct item by 1
+    data["stats"][1]["value"] += 1
+    #save file
+    with open("config.json","w") as file:
+        json.dump(data,file,indent=2)
+
+
+def updateFavCharacter(characterName):
+    data = json.load(open("config.json"))
+    open("config.json").close()
+    character = characterName + "play"
+    for i in data["stats"]:
+        if i["type"] == character:
+            count = i["value"] + 1
+    if characterName == "bogos":
+        data["stats"][2]["value"] = count
+    elif characterName == "marlo":
+        data["stats"][3]["value"] = count
+    with open("config.json","w") as file:
+        json.dump(data,file,indent=2)
+
+
+def loadSoundConfig():
+    data =json.load(open("config.json"))
+    open("config.json").close()
+    for i in data["sounds"]:
+        if i["type"] == "master":
+            masterVol = i["value"]
+        elif i["type"] == "sound":
+            soundVol = i["value"]
+        elif i["type"] == "music":
+            musicVol = i["value"]
+    return masterVol,soundVol,musicVol
+
+def saveSoundConfig(master,sound,music):
+    data = json.load(open("config.json"))
+    data["sounds"][0]["value"] = master
+    data["sounds"][1]["value"] = sound
+    data["sounds"][2]["value"] = music
+    with open("config.json","w") as file:
+        json.dump(data,file,indent=2)
+
+def loadStatsConfig():
+    #pull all data from the file, then close it
+    data =json.load(open("config.json"))
+    open("config.json").close()    
+    #go through all the stats related things, assign variables as appropriate
+    for i in data["stats"]:
+        if i["type"] == "playTime":
+            playTime = i["value"]
+        elif i["type"] == "wins":
+            wins = i["value"]
+        elif i["type"] == "bogosplay":
+            bogoscount = i["value"]
+        elif i["type"] == "marloplay":
+            marlocount = i["value"]
+    #choose who's the most played character based on this
+    if bogoscount > marlocount:
+        mostPlayed = "bogos"
+    elif marlocount > bogoscount:
+        mostPlayed = "marlo"
+    else:
+        mostPlayed = "none"
+    #return the values
+    return playTime,wins,mostPlayed
+
+def updateStatsText(highScore,playTime,mostPlayed):
+    winsText = menuFont.render("wins: {}".format(highScore),False,(255,255,255))
+    playTimeText = menuFont.render("play time: {}".format(convertTime(playTime)),False,(255,255,255))
+    mostPlayedText = menuFont.render("most played character: {}".format(mostPlayed),False,(255,255,255))
+    return winsText,playTimeText,mostPlayedText
 
 #initialise the pygame module
 pygame.init()
@@ -153,21 +255,41 @@ menuFont = pygame.font.SysFont("comic sans MS",30)
 mainMenuText = menuFont.render("main menu",False,(255,255,255))
 optionsMenuText = menuFont.render("options",False,(255,255,255))
 characterSelectText = menuFont.render("choose your character",False,(255,255,255))
+
 statsText = menuFont.render("stats",False,(255,255,255))
 
+if not(os.path.isfile("config.json")):
+    data = {'sounds': [
+    {'type': 'master', 'value': 1},
+    {'type': 'sound', 'value': 1}, 
+    {'type': 'music', 'value': 0.5}
+    ], 
+    'stats': [
+    {'type': 'playTime', 'value': 0}, 
+    {'type': 'wins', 'value': 0}, 
+    {'type': 'bogosplay', 'value': 0}, 
+    {'type': 'marloplay', 'value': 0}
+    ]
+    }
+    with open("config.json","w") as file:
+        json.dump(data,file,indent=2)
+
+
+masterVol,soundVol,musicVol = loadSoundConfig()
+playTime,wins,mostPlayed = loadStatsConfig()
+winsText,playTimeText,mostPlayedText = updateStatsText(wins,playTime,mostPlayed)
 
 #text for stats stuff:
 
 #these are placeholders to show that it works, in a future version this values will be read from a config file.
-highScore = 500
-playTime = "60 hours"
-mostPlayed = "example"
 
-
-highScoreText = menuFont.render("high score: {}".format(highScore),False,(255,255,255))
-playTimeText = menuFont.render("play time: {}".format(playTime),False,(255,255,255))
-mostPlayedText = menuFont.render("most played character: {}".format(mostPlayed),False,(255,255,255))
-highScoreTextPos = highScoreText.get_rect()
+#wins = 500
+#playTime = "60 hours"
+#mostPlayed = "example"
+#highScoreText = menuFont.render("high score: {}".format(highScore),False,(255,255,255))
+#playTimeText = menuFont.render("play time: {}".format(playTime),False,(255,255,255))
+#mostPlayedText = menuFont.render("most played character: {}".format(mostPlayed),False,(255,255,255))
+highScoreTextPos = winsText.get_rect()
 playTimeTextPos = playTimeText.get_rect()
 mostPlayedTextPos = mostPlayedText.get_rect()
 
@@ -247,6 +369,35 @@ healthImage.set_colorkey((255,255,255))
 ghostImage = pygame.image.load("sprites/ghost.png").convert()
 ghostImage.set_colorkey((255,255,255))
 
+
+"""
+testing for volume slider
+"""
+barX = 20
+barY = 300
+xscrollMaster = barX
+xscrollSoundfx = barX
+xscrollMusic = barX
+barWidth = 400
+barHeight = 5
+thickness = 10
+
+def slider(x,y,width,height,action=None):
+    global xscrollMaster,xscrollSoundfx,xscrollMusic                    #make these variables available to the rest of the program
+    cur = pygame.mouse.get_pos()                                        #get the position of the cursor
+    click = pygame.mouse.get_pressed()                                  #check if the mouse button is pressed
+    if x + width > cur[0] > x and y + height + 12 > cur[1] > y-12:      
+        pygame.draw.rect(gameDisplay,(255,255,255), (x,y,width,height)) #draw to the display the bar if it's possible
+        if click[0] == 1 and action != None:                            #if the bar is clicked and it has an action
+            if action == "master":                                      #if the action is for the master volume
+                xscrollMaster = cur[0]                                  #change the x coordinate of the rectangle appropriately
+            elif action == "soundfx":                                   #same for others
+                xscrollSoundfx = cur[0]
+            elif action == "music":
+                xscrollMusic = cur[0]
+    else:
+        pygame.draw.rect(gameDisplay,(255,255,255),(x,y,width,height))
+
 ##### MENU functions #####
 whatMenu = int(0)
 
@@ -270,12 +421,43 @@ def mainMenu():
     return whatMenu
 
 #options menu
-def optionsMenu():
-    whatMenu = 3
+def optionsMenu(firstTime):
+    global masterVol,soundVol,musicVol
+    if firstTime:
+        masterVol,soundVol,musicVol = loadSoundConfig()
+        global xscrollMaster,xscrollSoundfx,xscrollMusic
+        xscrollMaster = (masterVol)*barWidth + barX
+        xscrollSoundfx = (soundVol)*barWidth + barX
+        xscrollMusic = (musicVol)*barWidth + barX
+    
+    masterText = menuFont.render("Master Volume:",False,(255,255,255))
+    soundText = menuFont.render("Sound Effect Volume:",False,(255,255,255))
+    musicText = menuFont.render("Music Volume:",False,(255,255,255))
+    whatMenu = 5
+    #drawing background, all drawings must be done after this or it won't show up.
     gameDisplay.blit(backgroundImage,(0,0))
+    gameDisplay.blit(masterText,(barX,90))
     gameDisplay.blit(optionsMenuText,(340,0))
+    gameDisplay.blit(soundText,(barX,240))
+    gameDisplay.blit(musicText,(barX,390))
+    #master volume
+    slider(barX,barY-150, barWidth,barHeight,action="master")
+    pygame.draw.rect(gameDisplay,(255,255,255),[xscrollMaster -barHeight,barY-150 - 12,10,24])
+    masterVol = (1/barWidth)*(xscrollMaster-barX)
+    
+    #soundfx volume
+    slider(barX,barY, barWidth,barHeight,action="soundfx")
+    pygame.draw.rect(gameDisplay,(255,255,255),[xscrollSoundfx -barHeight,barY - 12,10,24])
+    soundVol = (1/barWidth)*(xscrollSoundfx-barX)
+    
+    #music volume
+    slider(barX,barY+150, barWidth,barHeight,action="music")
+    pygame.draw.rect(gameDisplay,(255,255,255),[xscrollMusic -barHeight,barY+150 - 12,10,24])
+    musicVol = (1/barWidth)*(xscrollMusic-barX)
+
     if goBackButton2.draw(gameDisplay) == True:
         whatMenu = 0
+        saveSoundConfig(masterVol,soundVol,musicVol)
     return whatMenu
 
 #stats menu
@@ -283,7 +465,7 @@ def statsMenu():
     whatMenu = 2
     gameDisplay.blit(backgroundImage,(0,0))
     gameDisplay.blit(statsText,(340,0))
-    gameDisplay.blit(highScoreText,(20,200))
+    gameDisplay.blit(winsText,(20,200))
     gameDisplay.blit(playTimeText,(20,300))
     gameDisplay.blit(mostPlayedText,(20,400))
     if goBackButton2.draw(gameDisplay) == True:
@@ -318,7 +500,7 @@ def playMenu(character,difficulty):
     #characters and difficulty       
     if character1Button.draw(gameDisplay) == True:
         #print("character 1 selected")
-        character = player.Marlo(character1,1,200,150,8,3)
+        character = player.Marlo(character1,1,200,150,8,4)
 
     if character2Button.draw(gameDisplay) == True:
         #print("character 2 selected")
@@ -357,12 +539,13 @@ def Menu():
             character = playMenuTuple[1]
             difficulty = playMenuTuple[2]
         
-        
         if whatMenu == 2:
             whatMenu = statsMenu()
 
         if whatMenu == 3:
-            whatMenu = optionsMenu()
+            whatMenu = optionsMenu(True)
+        if whatMenu == 5:
+            whatMenu = optionsMenu(False)
         if whatMenu == 4:
             break
 #set clockspeed to 60fps and update screen
@@ -434,6 +617,11 @@ def move(rect, movement, tiles):
             
     return movement[0],movement[1]
 
+def playSound(path,masterV,soundV):
+    sound = pygame.mixer.Sound(path)
+    sound.set_volume((masterV*soundV)**1.5)
+    sound.play()
+
 def enemyWallCollide(rect, movement, tiles):
     hit_list = collideTest(rect,tiles)
     for tile in hit_list:
@@ -455,7 +643,7 @@ def playerHit(character,enemyList):
     for enemy in enemyList:
         if character.rect.colliderect(enemy):
             if character.takeDamage(enemy.damage) ==1:
-                pygame.mixer.Sound("sounds/damage.mp3").play()
+                playSound("sounds/damage.mp3",masterVol,soundVol)
 
 def abilityPickup(character,lifeList):                    
     if character.fullSpecial():                             #check if max special
@@ -468,10 +656,13 @@ def abilityPickup(character,lifeList):
                 lifeList.remove(life)                       #remove from the list
 
 def upgradePickup(character,upgradelist):
-    for upgrade in upgradelist:
-        if character.rect.colliderect(upgrade):
-            upgradeType = upgrade.getType()
-            if upgradeType == 1:
+    for upgrade in upgradelist:                         #check all items in the list of upgrades against the player
+        if character.rect.colliderect(upgrade):         #if they're touching
+            upgradeType = upgrade.getType()             #get the type of upgrade
+            
+            #get the appropraite upgrade depending on the upgrade type
+            #remove the upgrade from the list afterwards
+            if upgradeType == 1:                        
                 character.increaseMaxHealth()
             elif upgradeType == 2:
                 character.increaseFireRate()
@@ -505,7 +696,9 @@ def findFloors(gameMap):
     return floorList
 
 def shootSound():
-    pygame.mixer.Sound("sounds/gun"+str(random.randint(0,4))+".mp3").play()
+    shootSound = pygame.mixer.Sound("sounds/gun"+str(random.randint(0,4))+".mp3")
+    shootSound.set_volume(math.log(1+masterVol * soundVol,2))
+    shootSound.play()
 
 def placeAngryDudes(gameMap,image,scale,difficulty,howMany):
     floors = findFloors(gameMap)
@@ -551,19 +744,19 @@ def placeLife(gameMap,image,scale,howMany):
     return lifeList
 
 def placeUpgradeBoxes(gameMap,image,scale,howMany):
-    floors = findFloors(gameMap)
-    if howMany > len(floors) - 1:
-        howMany = len(floors) - 1
-    upgradeBoxList = []
+    floors = findFloors(gameMap)                        #find valid floors
+    if howMany > len(floors) - 1:                       #make sure a valid number are being placed
+        howMany = len(floors) - 1                       
+    upgradeBoxList = []                                 #make a list of them
     for i in range(howMany):
         floor = random.randint(0,len(floors)-1)
         coordinates = floors[floor]
-        floors.pop(floor)
-        y,x = coordinates[0],coordinates[1]
-        upgrade = player.upgrade(image,scale,x,y)
-        upgradeBoxList.append(upgrade)
+        floors.pop(floor)                               #ensure only 1 is placed per tile
+        y,x = coordinates[0],coordinates[1]             
+        upgrade = player.upgrade(image,scale,x,y)       #build the upgrades
+        upgradeBoxList.append(upgrade)                  #add them to a list
 
-    return (upgradeBoxList)
+    return (upgradeBoxList)                             #return the list
 
 def createMatrix(gameMap):
     matrix = gameMap
@@ -707,19 +900,22 @@ def game(gameMap,character,difficulty,room):
         mousePressed = pygame.mouse.get_pressed()
         if mousePressed[0]:                                                                         #when the mouse button is pressed
             if character.getShootCooldown()>=character.getShootFrames():                            #if the bullet is ready to be fired
-                shootSound()
+                playSound("sounds/gun"+str(random.randint(0,4))+".mp3",masterVol,soundVol)
                 bullet = player.Bullet(screenSizeX/2,screenSizeY/2,character.damage,cameraOffset,character.getPen())   #create a bullet object and put it in a list
                 bullets.append(bullet)
                 character.resetShootDelay()                                                         #reset it so its not ready to fire.
-        
-        
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             if mousePressed[2]:
-                cameraOffset = character.ability(cameraOffset,currentRes,floors)
+                if character.getName() == "marlo":
+                    character.ability()
+                elif character.getName() == "bogos":
+                    cameraOffset,activated = character.ability(cameraOffset,currentRes,floors)
+                    if activated == 1:
+                        playSound("sounds/bogos.mp3",masterVol,soundVol)
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
@@ -864,6 +1060,7 @@ def levelGeneration(Array):
     return grid
 
 gameOrMenu = 0
+start = float(0)
 done = False
 while True:
     #if you're in the menu this functions are ran.
@@ -878,15 +1075,41 @@ while True:
     if gameOrMenu == 11:
         gameOrMenu = 0
         print("you win!")
-        pygame.mixer.Sound("sounds/win.mp3").play()
+        pygame.mixer.music.stop()
+        playSound("sounds/win.mp3",masterVol,soundVol)
+        end = time.time()
+        #calculate time taken
+        playTime = end-start
+        updatePlayTime(playTime)
+        #increment win count
+        updateWins()
+        #reload stats
+        playTime,wins,mostPlayed = loadStatsConfig()
+        winsText,playTimeText,mostPlayedText = updateStatsText(wins,playTime,mostPlayed)
+
+
     #if the character's health drops to 0 or below
     if gameOrMenu ==99:
         gameOrMenu = 0
         print("you died :(")
-        pygame.mixer.Sound("sounds/lose.mp3").play()
+        pygame.mixer.music.stop()
+        playSound("sounds/lose.mp3",masterVol,soundVol)
+        end = time.time()
+        #calculate time taken
+        playTime = end - start
+        updatePlayTime(playTime)
+        #reload stats
+        playTime,wins,mostPlayed = loadStatsConfig()
+        winsText,playTimeText,mostPlayedText = updateStatsText(wins,playTime,mostPlayed)
 
-    #done is always False as nothing changes it
-    # every time a room number is returned, this code is ran in order to generate a new grid.     
+    if gameOrMenu == 1:
+        pygame.mixer.music.load("sounds/gameMusic.mp3")
+        pygame.mixer.music.set_volume((masterVol*musicVol)**1.5)
+        pygame.mixer.music.play(-1)
+        updateFavCharacter(character.getName())
+        start = time.time()
+
+    # every time a room number is returned, this code is ran in order to generate a new grid.
     if gameOrMenu >= 1 and done == False:
         gameGrid = buildGrid()
         gameMap = levelGeneration(gameGrid)

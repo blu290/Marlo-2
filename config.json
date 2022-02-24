@@ -1,0 +1,34 @@
+{
+  "sounds": [
+    {
+      "type": "master",
+      "value": 1.0
+    },
+    {
+      "type": "sound",
+      "value": 1.0
+    },
+    {
+      "type": "music",
+      "value": 0.5
+    }
+  ],
+  "stats": [
+    {
+      "type": "playTime",
+      "value": 0
+    },
+    {
+      "type": "wins",
+      "value": 0
+    },
+    {
+      "type": "bogosplay",
+      "value": 0
+    },
+    {
+      "type": "marloplay",
+      "value": 0
+    }
+  ]
+}

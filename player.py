@@ -40,15 +40,15 @@ class Marlo(pygame.sprite.Sprite):
     self.bulletPenetration = 1
   
   def SUPERMARLO(self):
-    self.damage = 666
-    self.specialReady = 20
+    self.damage = 666               #increase damage
+    self.specialReady = 20          #reduce cooldown on special ability
     self.specialTicks = 20
-    self.bulletPenetration = 666
-    self.special = 666
+    self.bulletPenetration = 666    #increase bullet penetration
+    self.special = 666              #increase special
     self.maxSpecial = 666
-    self.health = 666
+    self.health = 666               #increase health
     self.maxHealth = 666
-    self.shootFrames = 0
+    self.shootFrames = 0            #increase firerate to 3600RPM
 
   def getPen(self):
     return self.bulletPenetration
@@ -131,7 +131,7 @@ class Marlo(pygame.sprite.Sprite):
     self.health += 2
   
   def increaseFireRate(self):
-    self.shootFrames -= 2
+    self.shootFrames -= 4
   
   def increaseDamage(self):
     if self.damage >= 12:
@@ -141,20 +141,20 @@ class Marlo(pygame.sprite.Sprite):
   
   def increaseMaxSpecial(self):
     self.maxSpecial += 1
+    self.special += 1
 
   def getName(self):
     return self.name
 
-  def ability(self,cameraOffset,resolution,floors):
+  def ability(self):
     if self.special > 0:                            #standard check
       if self.specialTicks >= self.specialReady:
-        if self.health == self.maxhealth:
+        if self.health < self.maxHealth:
           self.special -= 1
           self.health += self.healthincrease          #standard health increase
           self.specialTicks = 0
           if self.health > self.maxHealth:
             self.health = self.maxHealth
-    return cameraOffset
 
 class Bogos(Marlo):
   def __init__(self,image,scale,x,y,health,damage):
@@ -168,8 +168,10 @@ class Bogos(Marlo):
     #return False
 
   def ability(self,cameraOffset,resolution,floors):
+    active = 0
     if self.special > 0:                                            #perform checks
-      if self.specialTicks >= self.specialReady:                
+      if self.specialTicks >= self.specialReady:
+        active = 1                
         mx, my = pygame.mouse.get_pos()                             #get mouse position
         x = int(-resolution[0]/4 + mx/2)
         y = int(-resolution[1]/4 + my/2)                            #calculate vector based on displacement between player and mouse
@@ -177,10 +179,9 @@ class Bogos(Marlo):
         mouseTile = (int(tile[1]+y/32),int(tile[0]+x/32))           #find what tile it's on
         if mouseTile in floors:                                     #check if valid tile
           cameraOffset = [cameraOffset[0] + x,cameraOffset[1] + y]  #if it is then make the player go to the new tile
-          pygame.mixer.Sound("sounds/bogos.mp3").play()
           self.special -= 1                                         #remove 1 special and reset ticks
           self.specialTicks = 0
-    return cameraOffset
+    return cameraOffset,active
 
   def heal(self,heal):                         #health won't heal bogos, it will instead recharge his teleporter
     self.special += 1
@@ -228,11 +229,12 @@ class upgrade(pygame.sprite.Sprite):
     self.starty = tiley
     self.type = random.randint(1,4)
 
-  def updatePosition(self,cameraOffset):
+  #call each frame to ensure that it's in the right place. 
+  def updatePosition(self,cameraOffset):            
     self.rect.x = (self.startx)*32 - cameraOffset[0]
     self.rect.y = (self.starty)*32 - cameraOffset[1]
 
-  #the different options
+  #return which method is supposed to be ran.
   def getType(self):
     self.kill()
     return self.type
