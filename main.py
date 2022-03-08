@@ -1,4 +1,5 @@
 from doctest import master
+from faulthandler import disable
 import time
 import button
 import sys
@@ -9,6 +10,7 @@ import copy
 import os
 import json
 import math
+import hashlib
 try:
     import pygame
     #from pygame.locals import*
@@ -86,7 +88,8 @@ def buildGrid():
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]]
     return gameGrid
-
+global modifiedSave
+modifiedSave = False
 def walker(grid):
     x = 29
     y = 29
@@ -141,6 +144,47 @@ def placeWalls(grid):
                         grid[y][x-1] = 2
     return(grid)
 
+def generateHash():
+    with open ("config.json","rb") as f:                #open in binary format for reading
+        bytes = f.read()                                #store all data in file as variable
+        hashed = hashlib.sha256(bytes).hexdigest();     #hash using sha256
+        return hashed                                   #print value, to ensure it's working correctly.
+
+def saveHash(data):
+    #write to the file called hash, the data passed to it
+    #if the save has been modified then abort
+    if modifiedSave is True:
+        return -1
+    f =  open ("hash","w")
+    f.write(data)
+    f.close
+        
+def readHash():
+    #read data from the file called hash
+    f = open("hash","r")
+    data = f.read()
+    f.close()
+    return data
+
+def generateNewSave():
+    data = {'warning': [{'warning': 'editing this file can cause the game to stop working correctly, to recover from this, delete the file and a new one will be generated. you have been warned'}
+    ],
+    'sounds': [
+    {'type': 'master', 'value': 1},
+    {'type': 'sound', 'value': 1}, 
+    {'type': 'music', 'value': 0.5}
+    ], 
+    'stats': [
+    {'type': 'playTime', 'value': 0}, 
+    {'type': 'wins', 'value': 0}, 
+    {'type': 'bogosplay', 'value': 0}, 
+    {'type': 'marloplay', 'value': 0}
+    ]
+    }
+    with open("config.json","w") as file:
+        json.dump(data,file,indent=2)
+    saveHash(generateHash())
+
 def convertTime(seconds):
     #if less than 2 minutes, show in seconds
     if seconds // 60 >= 2:
@@ -164,6 +208,8 @@ def updatePlayTime(playTime):
     data["stats"][0]["value"] = playTime            #add the total playtime with the time they just played now
     with open("config.json","w") as file:           #rewrite the entire file with the new contents
         json.dump(data,file,indent=2)
+    saveHash(generateHash())
+
 
 
 def updateWins():
@@ -175,6 +221,8 @@ def updateWins():
     #save file
     with open("config.json","w") as file:
         json.dump(data,file,indent=2)
+    saveHash(generateHash())
+
 
 
 def updateFavCharacter(characterName):
@@ -190,6 +238,8 @@ def updateFavCharacter(characterName):
         data["stats"][3]["value"] = count
     with open("config.json","w") as file:
         json.dump(data,file,indent=2)
+    saveHash(generateHash())
+
 
 
 def loadSoundConfig():
@@ -211,6 +261,8 @@ def saveSoundConfig(master,sound,music):
     data["sounds"][2]["value"] = music
     with open("config.json","w") as file:
         json.dump(data,file,indent=2)
+    saveHash(generateHash())
+
 
 def loadStatsConfig():
     #pull all data from the file, then close it
@@ -251,29 +303,15 @@ programIcon = pygame.image.load('icon.png')
 pygame.display.set_icon(programIcon)
 #setting up text font to be used and size:
 menuFont = pygame.font.SysFont("comic sans MS",30)
+warningFont = pygame.font.SysFont("comic sans MS",18)
 
 mainMenuText = menuFont.render("main menu",False,(255,255,255))
 optionsMenuText = menuFont.render("options",False,(255,255,255))
 characterSelectText = menuFont.render("choose your character",False,(255,255,255))
 
 statsText = menuFont.render("stats",False,(255,255,255))
-
 if not(os.path.isfile("config.json")):
-    data = {'sounds': [
-    {'type': 'master', 'value': 1},
-    {'type': 'sound', 'value': 1}, 
-    {'type': 'music', 'value': 0.5}
-    ], 
-    'stats': [
-    {'type': 'playTime', 'value': 0}, 
-    {'type': 'wins', 'value': 0}, 
-    {'type': 'bogosplay', 'value': 0}, 
-    {'type': 'marloplay', 'value': 0}
-    ]
-    }
-    with open("config.json","w") as file:
-        json.dump(data,file,indent=2)
-
+    generateNewSave()
 
 masterVol,soundVol,musicVol = loadSoundConfig()
 playTime,wins,mostPlayed = loadStatsConfig()
@@ -292,9 +330,6 @@ winsText,playTimeText,mostPlayedText = updateStatsText(wins,playTime,mostPlayed)
 highScoreTextPos = winsText.get_rect()
 playTimeTextPos = playTimeText.get_rect()
 mostPlayedTextPos = mostPlayedText.get_rect()
-
-#positions for them
-
 
 mainMenuTextPos = mainMenuText.get_rect()
 optionsMenuTextPos = optionsMenuText.get_rect()
@@ -336,7 +371,17 @@ goBackButton = button.Button(20,300,goBackButtonImg,0.25)
 
 #same but for options and stats (they will do the same thing and be in same place so the same object can be used)
 goBackButtonImg = pygame.image.load("buttons/goBack.png").convert()
-goBackButton2 = button.Button(20,500,goBackButtonImg,0.25)
+goBackButton2 = button.Button(600,500,goBackButtonImg,0.25)
+
+#save warning related
+ignoreWarnButton = pygame.image.load("buttons/ignoreWarning.png").convert()
+ignoreButton = button.Button(500,400,ignoreWarnButton,0.25)
+
+makeNewSaveButton = pygame.image.load("buttons/makeNewSave.png").convert()
+makeNewSave = button.Button(500,300,makeNewSaveButton,0.25)
+
+disableWarningimg = pygame.image.load("buttons/disableWarning.png").convert()
+disableWarning = button.Button(500,500,disableWarningimg,0.25)
 
 #play button menu objects:
 #characters and difficulty buttons
@@ -370,23 +415,20 @@ ghostImage = pygame.image.load("sprites/ghost.png").convert()
 ghostImage.set_colorkey((255,255,255))
 
 
-"""
-testing for volume slider
-"""
-barX = 20
-barY = 300
-xscrollMaster = barX
+#volume slider related stuff
+barX = 20                   #x offset of bar
+barY = 300                  #y offset of middle bar
+xscrollMaster = barX        #set the default values to 0
 xscrollSoundfx = barX
 xscrollMusic = barX
-barWidth = 400
-barHeight = 5
-thickness = 10
+barWidth = 400              #set the length to 400
+barHeight = 5               #height to 5
 
 def slider(x,y,width,height,action=None):
     global xscrollMaster,xscrollSoundfx,xscrollMusic                    #make these variables available to the rest of the program
     cur = pygame.mouse.get_pos()                                        #get the position of the cursor
     click = pygame.mouse.get_pressed()                                  #check if the mouse button is pressed
-    if x + width > cur[0] > x and y + height + 12 > cur[1] > y-12:      
+    if x + width > cur[0] > x and y + height + 12 > cur[1] > y-12:      #check if the cursr is in bounds
         pygame.draw.rect(gameDisplay,(255,255,255), (x,y,width,height)) #draw to the display the bar if it's possible
         if click[0] == 1 and action != None:                            #if the bar is clicked and it has an action
             if action == "master":                                      #if the action is for the master volume
@@ -429,27 +471,31 @@ def optionsMenu(firstTime):
         xscrollMaster = (masterVol)*barWidth + barX
         xscrollSoundfx = (soundVol)*barWidth + barX
         xscrollMusic = (musicVol)*barWidth + barX
-    
+        
+    whatMenu = 5
+
+    #rendering text for each volume
     masterText = menuFont.render("Master Volume:",False,(255,255,255))
     soundText = menuFont.render("Sound Effect Volume:",False,(255,255,255))
     musicText = menuFont.render("Music Volume:",False,(255,255,255))
-    whatMenu = 5
+
     #drawing background, all drawings must be done after this or it won't show up.
     gameDisplay.blit(backgroundImage,(0,0))
     gameDisplay.blit(masterText,(barX,90))
     gameDisplay.blit(optionsMenuText,(340,0))
     gameDisplay.blit(soundText,(barX,240))
     gameDisplay.blit(musicText,(barX,390))
+
     #master volume
     slider(barX,barY-150, barWidth,barHeight,action="master")
-    pygame.draw.rect(gameDisplay,(255,255,255),[xscrollMaster -barHeight,barY-150 - 12,10,24])
+    pygame.draw.rect(gameDisplay,(255,255,255),[xscrollMaster- barHeight,barY-150 -12,10,24])
     masterVol = (1/barWidth)*(xscrollMaster-barX)
-    
+
     #soundfx volume
     slider(barX,barY, barWidth,barHeight,action="soundfx")
     pygame.draw.rect(gameDisplay,(255,255,255),[xscrollSoundfx -barHeight,barY - 12,10,24])
     soundVol = (1/barWidth)*(xscrollSoundfx-barX)
-    
+
     #music volume
     slider(barX,barY+150, barWidth,barHeight,action="music")
     pygame.draw.rect(gameDisplay,(255,255,255),[xscrollMusic -barHeight,barY+150 - 12,10,24])
@@ -462,6 +508,8 @@ def optionsMenu(firstTime):
 
 #stats menu
 def statsMenu():
+    playTime,wins,mostPlayed = loadStatsConfig()
+    winsText,playTimeText,mostPlayedText = updateStatsText(wins,playTime,mostPlayed)
     whatMenu = 2
     gameDisplay.blit(backgroundImage,(0,0))
     gameDisplay.blit(statsText,(340,0))
@@ -480,6 +528,35 @@ difficulty = 0
 #whatMenu is already known and doesn't change until the player hits a button so this doesn't need to be passed
 #character and difficulty must be passed
 
+def saveWarning():
+    #make sure it stays on this menu
+    whatMenu = -1                   
+    #render and display all the text                                                                                                                        
+    warnText1 = menuFont.render("Warning: save file modified!!",False,(255,255,255))
+    warnText2 = warningFont.render("modifying the save file may cause the game to cease functioning and/or cause loss of save data.",False,(255,255,255))
+    warnText3 = warningFont.render("it is recommended that you generate a new save file to avoid these issues.",False,(255,255,255))
+    warnText4 = warningFont.render("if you are aware of the risks, you can choose to ignore this warning.",False,(255,255,255))
+    gameDisplay.blit(warnText1,(0,0))
+    gameDisplay.blit(warnText2,(0,100))
+    gameDisplay.blit(warnText3,(0,150))
+    gameDisplay.blit(warnText4,(0,200))
+
+    #if the button to ignore the error is pressed then ignore it but flag the save as modified
+    if ignoreButton.draw(gameDisplay) == True:
+        global modifiedSave
+        modifiedSave = True
+        whatMenu = 0
+    #if the button to generate a new save is pressed then generate a new save and load the new config
+    if makeNewSave.draw(gameDisplay) == True:
+        generateNewSave()
+        loadSoundConfig()
+        whatMenu = 0
+    #if disable the warning is pressed then just generate a new hash for the file
+    if disableWarning.draw(gameDisplay) == True:
+        saveHash(generateHash())
+        whatMenu = 0
+
+    return whatMenu
 
 def playMenu(character,difficulty):
     whatMenu = int(1)
@@ -517,8 +594,9 @@ def playMenu(character,difficulty):
     return (whatMenu,character,difficulty)
 
 #main menu loop
-def Menu():
-    whatMenu =0
+def Menu(whatMenu=0):
+
+    whatMenu = whatMenu
     menuLoop = 1
     while menuLoop == 1:
 
@@ -527,6 +605,11 @@ def Menu():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
+        if whatMenu == -1:              #if the stored hash does not match the hash of the config file
+            whatMenu = saveWarning()
+            character = 0
+            difficulty = 0
 
         if whatMenu == 0:
             whatMenu = mainMenu()
@@ -1058,12 +1141,23 @@ def levelGeneration(Array):
     grid = placeWalls(grid)
 
     return grid
+if (os.path.isfile("hash")):
+    if readHash() == generateHash():
+        gameOrMenu = 0
+    else:
+        gameOrMenu = -1
+else:
+    gameOrMenu = -1
 
-gameOrMenu = 0
 start = float(0)
 done = False
 while True:
     #if you're in the menu this functions are ran.
+    if gameOrMenu == -1:
+        returnTuple = Menu(-1)
+        gameOrMenu = returnTuple[0]
+        character = returnTuple[1]
+        difficulty = returnTuple[2]
     if gameOrMenu == 0:
         returnTuple = Menu()
         gameOrMenu = returnTuple[0]
